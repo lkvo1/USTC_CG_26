@@ -14,20 +14,56 @@ import numpy as np
 import cv2 as cv
 
 
-# TODO: 你需要在这个函数中实现单步去噪过程
 @torch.no_grad()
 def sample_timestep(model, x, t):
-    return x
+    betas_t = get_index_from_list(betas, t, x.shape)
+    sqrt_one_minus_alphas_cumprod_t = get_index_from_list(
+        sqrt_one_minus_alphas_cumprod, t, x.shape
+    )
+    sqrt_recip_alphas_t = get_index_from_list(sqrt_recip_alphas, t, x.shape)
+    posterior_variance_t = get_index_from_list(posterior_variance, t, x.shape)
 
-# TODO: 你需要在这个函数中完成对纯高斯噪声的去噪，并输出对应的去噪图片
-# 你需要调用上面的sample_timestep函数，以实现单步去噪
+    noise_pred = model(x, t)
+
+    model_mean = sqrt_recip_alphas_t * (
+        x - betas_t * noise_pred / sqrt_one_minus_alphas_cumprod_t
+    )
+
+    if t[0] == 0:
+        return model_mean
+
+    noise = torch.randn_like(x)
+    return model_mean + torch.sqrt(posterior_variance_t) * noise
+
+
 @torch.no_grad()
 def sample_plot_image(model, device, img_size, T):
-    pass
+    # pure noise
+    img =torch.randn((1, 3, img_size, img_size)).to(device)
 
-# TODO: 你需要在这个函数中完成模型以及其他相关资源的加载，并调用sample_plot_image进行去噪，以生成图片
+    for i in reversed(range(T)):
+        t = torch.tensor([i], device=device).long()
+        img = sample_timestep(model, img, t)
+
+    # plot the generated image
+    plt.figure(figsize=(4, 4))
+    show_tensor_image(img.detach().cpu())
+    plt.axis("off")
+    plt.show()
+
+    return img
+
 def test_image_generation():
-    pass
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    T = 300
+    img_size = 256
+
+    model = SimpleUnet().to(device)
+    ckpt = "./ddpm_mse_epochs_5000.pth"
+    model.load_state_dict(torch.load(ckpt, map_location=device))
+    model.eval()
+
+    sample_plot_image(model, device, img_size, T)
 
 # TODO：你需要在这个函数中实现图像的补充
 # Follows: RePaint: Inpainting using Denoising Diffusion Probabilistic Models
