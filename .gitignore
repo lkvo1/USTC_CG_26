@@ -7,3 +7,4 @@ imgui.ini
 .vs
 *.zip
 FrameworkDDPM/__pycache__
+*.pth

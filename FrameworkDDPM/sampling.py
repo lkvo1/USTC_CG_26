@@ -12,6 +12,7 @@ from dataloader import show_tensor_image
 from unet import SimpleUnet
 import numpy as np
 import cv2 as cv
+from tqdm import tqdm
 
 
 @torch.no_grad()
@@ -39,9 +40,9 @@ def sample_timestep(model, x, t):
 @torch.no_grad()
 def sample_plot_image(model, device, img_size, T):
     # pure noise
-    img =torch.randn((1, 3, img_size, img_size)).to(device)
+    img = torch.randn((1, 3, img_size, img_size)).to(device)
 
-    for i in reversed(range(T)):
+    for i in tqdm(reversed(range(T)), desc="Sampling", total=T):
         t = torch.tensor([i], device=device).long()
         img = sample_timestep(model, img, t)
 
@@ -74,7 +75,7 @@ def inpaint(model, device, img, mask, t_max=50):
 # TODO: 你需要在这个函数中完成模型以及其他相关资源的加载，并调用inpaint进行图像补全，以生成图片
 def test_image_inpainting():
     pass
-    
+
 
 if __name__ == "__main__":
     test_image_generation()

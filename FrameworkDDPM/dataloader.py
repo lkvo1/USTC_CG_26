@@ -33,6 +33,7 @@ def show_tensor_image(image):
     # Reverse the data transformations
     reverse_transforms = transforms.Compose(
         [
+            transforms.Lambda(lambda t: torch.clamp(t, -1, 1)),
             transforms.Lambda(lambda t: (t + 1) / 2),
             transforms.Lambda(lambda t: t.permute(1, 2, 0)),  # CHW to HWC
             transforms.Lambda(lambda t: t * 255.0),
