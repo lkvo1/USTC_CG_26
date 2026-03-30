@@ -7,4 +7,5 @@ imgui.ini
 .vs
 *.zip
 FrameworkDDPM/__pycache__
+/home/hbt/lkvo/projects/USTC_CG_26/FrameworkDDPM/ddpm_mse_epochs_5000.pth
 *.pth

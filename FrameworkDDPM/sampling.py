@@ -66,15 +66,66 @@ def test_image_generation():
 
     sample_plot_image(model, device, img_size, T)
 
-# TODO：你需要在这个函数中实现图像的补充
-# Follows: RePaint: Inpainting using Denoising Diffusion Probabilistic Models
 @torch.no_grad()
 def inpaint(model, device, img, mask, t_max=50):
-    return img
+    img = img.to(device)
+    mask = mask.to(device)
+    
+    # Init x at t_max
+    t_start = torch.ones((img.shape[0],), device=device).long() * (t_max - 1)
+    x = forward_diffusion_sample(img, t_start, device)[0]
+    
+    for i in tqdm(reversed(range(t_max)), desc="Inpainting", total=t_max):
+        t = torch.tensor([i], device=device).long()
+        x_unknown = sample_timestep(model, x, t)
+        
+        if i == 0:
+            x_known = img
+        else:
+            t_minus_1 = torch.tensor([i - 1], device=device).long()
+            x_known = forward_diffusion_sample(img, t_minus_1, device)[0]
+            
+        x = mask * x_known + (1.0 - mask) * x_unknown
 
-# TODO: 你需要在这个函数中完成模型以及其他相关资源的加载，并调用inpaint进行图像补全，以生成图片
+    plt.figure(figsize=(4, 4))
+    show_tensor_image((x.detach().cpu() + 1) / 2)  # normalize to 0-1 range for showing
+    plt.axis("off")
+    plt.show()
+
+    return x
+
 def test_image_inpainting():
-    pass
+    from PIL import Image
+    import torchvision.transforms as transforms
+    from torchvision.utils import save_image
+    
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    img_size = 256
+    t_max = 300  # For full generation, or use 50 for local touch up; RePaint uses the whole T
+
+    model = SimpleUnet().to(device)
+    ckpt = "./ddpm_mse_epochs_5000.pth"
+    model.load_state_dict(torch.load(ckpt, map_location=device))
+    model.eval()
+
+    # Load image
+    img_path = "datasets-1/test/cls0/1.jpg"
+    raw_img = Image.open(img_path).convert("RGB")
+    transform = transforms.Compose([
+        transforms.Resize((img_size, img_size)),
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    ])
+    img_tensor = transform(raw_img).unsqueeze(0).to(device)
+    
+    # Create mask (1 is known, 0 is unknown/to inpaint)
+    mask = torch.ones_like(img_tensor).to(device)
+    # create a hole
+    mask[:, :, 100:150, 100:150] = 0.0
+    
+    res = inpaint(model, device, img_tensor, mask, t_max=t_max)
+    save_image((res + 1) / 2, "inpainted_result.png")
+    print("Saved inpainted image to inpainted_result.png")
 
 
 if __name__ == "__main__":
