@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import os
 
 
-def load_transformed_dataset(img_size=256, batch_size=128) -> DataLoader:
+def load_transformed_dataset(img_size=256, batch_size=128, dataset_name="datasets-1") -> DataLoader:
     # Load dataset and perform data transformations
     data_transforms = [
         transforms.Resize((img_size, img_size)),
@@ -17,8 +17,8 @@ def load_transformed_dataset(img_size=256, batch_size=128) -> DataLoader:
     data_transform = transforms.Compose(data_transforms)
 
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    train_path = os.path.join(base_dir, "datasets-1", "train")
-    test_path = os.path.join(base_dir, "datasets-1", "test")
+    train_path = os.path.join(base_dir, dataset_name, "train")
+    test_path = os.path.join(base_dir, dataset_name, "test")
 
     train = torchvision.datasets.ImageFolder(root=train_path, transform=data_transform)
 

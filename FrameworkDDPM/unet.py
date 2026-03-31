@@ -55,7 +55,7 @@ class SinusoidalPositionEmbeddings(nn.Module):
 
 
 class SimpleUnet(nn.Module):
-    def __init__(self):
+    def __init__(self, num_classes=2):
         super().__init__()
         image_channels = 3
         down_channels = (64, 128, 256, 512, 1024)
@@ -67,6 +67,9 @@ class SimpleUnet(nn.Module):
         self.time_mlp = nn.Sequential(
             SinusoidalPositionEmbeddings(time_emb_dim), nn.Linear(time_emb_dim, time_emb_dim), nn.ReLU()
         )
+        
+        # Class embedding
+        self.class_emb = nn.Embedding(num_classes, time_emb_dim)
 
         # Initial projection
         self.conv0 = nn.Conv2d(image_channels, down_channels[0], 3, padding=1)
@@ -82,9 +85,11 @@ class SimpleUnet(nn.Module):
 
         self.output = nn.Conv2d(up_channels[-1], out_dim, 1)
 
-    def forward(self, x, timestep):
+    def forward(self, x, timestep, c=None):
         # Embedd time
         t = self.time_mlp(timestep)
+        if c is not None:
+            t = t + self.class_emb(c)
         # Initial conv
         x = self.conv0(x)
         # Unet
@@ -101,11 +106,12 @@ class SimpleUnet(nn.Module):
 
 
 if __name__ == "__main__":
-    model = SimpleUnet()
+    model = SimpleUnet(num_classes=2)
     print("Num params: ", sum(p.numel() for p in model.parameters()))
     print(model)
     img_size = 64
     device = "cpu"
     img = torch.randn((1, 3, img_size, img_size), device=device)
     t = torch.tensor([4], device=device)
-    model(img, t)
+    c = torch.tensor([1], device=device)
+    model(img, t, c)

@@ -16,7 +16,7 @@ from tqdm import tqdm
 
 
 @torch.no_grad()
-def sample_timestep(model, x, t):
+def sample_timestep(model, x, t, c=None):
     betas_t = get_index_from_list(betas, t, x.shape)
     sqrt_one_minus_alphas_cumprod_t = get_index_from_list(
         sqrt_one_minus_alphas_cumprod, t, x.shape
@@ -24,7 +24,10 @@ def sample_timestep(model, x, t):
     sqrt_recip_alphas_t = get_index_from_list(sqrt_recip_alphas, t, x.shape)
     posterior_variance_t = get_index_from_list(posterior_variance, t, x.shape)
 
-    noise_pred = model(x, t)
+    if c is not None:
+        noise_pred = model(x, t, c)
+    else:
+        noise_pred = model(x, t)
 
     model_mean = sqrt_recip_alphas_t * (
         x - betas_t * noise_pred / sqrt_one_minus_alphas_cumprod_t
@@ -38,18 +41,20 @@ def sample_timestep(model, x, t):
 
 
 @torch.no_grad()
-def sample_plot_image(model, device, img_size, T):
+def sample_plot_image(model, device, img_size, T, c=None):
     # pure noise
     img = torch.randn((1, 3, img_size, img_size)).to(device)
 
     for i in tqdm(reversed(range(T)), desc="Sampling", total=T):
         t = torch.tensor([i], device=device).long()
-        img = sample_timestep(model, img, t)
+        img = sample_timestep(model, img, t, c)
 
     # plot the generated image
     plt.figure(figsize=(4, 4))
     show_tensor_image(img.detach().cpu())
     plt.axis("off")
+    title_str = "Generated Image" if c is None else f"Generated Image (Class {c.item()})"
+    plt.title(title_str)
     plt.show()
 
     return img
@@ -59,12 +64,23 @@ def test_image_generation():
     T = 300
     img_size = 256
 
-    model = SimpleUnet().to(device)
-    ckpt = "./ddpm_mse_epochs_5000.pth"
-    model.load_state_dict(torch.load(ckpt, map_location=device))
+    model = SimpleUnet(num_classes=2).to(device)
+    ckpt = "./ddpm_cond_epochs_5000.pth" # Conditional weights 
+    try:
+        model.load_state_dict(torch.load(ckpt, map_location=device))
+    except Exception as e:
+        print(f"Loading weights failed, train first if running conditional: {e}")
+        return
+        
     model.eval()
 
-    sample_plot_image(model, device, img_size, T)
+    print("Generating Class 0 image...")
+    c_0 = torch.tensor([0], device=device).long()
+    sample_plot_image(model, device, img_size, T, c=c_0)
+    
+    print("Generating Class 1 image...")
+    c_1 = torch.tensor([1], device=device).long()
+    sample_plot_image(model, device, img_size, T, c=c_1)
 
 @torch.no_grad()
 def inpaint(model, device, img, mask, t_max=50):
@@ -103,9 +119,12 @@ def test_image_inpainting():
     img_size = 256
     t_max = 300  # For full generation, or use 50 for local touch up; RePaint uses the whole T
 
-    model = SimpleUnet().to(device)
+    model = SimpleUnet(num_classes=2).to(device) # using updated Unet
     ckpt = "./ddpm_mse_epochs_5000.pth"
-    model.load_state_dict(torch.load(ckpt, map_location=device))
+    try:
+        model.load_state_dict(torch.load(ckpt, map_location=device), strict=False)
+    except Exception as e:
+        print(f"Warning: {e}")
     model.eval()
 
     # Load image
